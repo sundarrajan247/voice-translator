@@ -7,13 +7,19 @@
   <style>
     body{font-family:system-ui,Segoe UI,Arial;margin:2rem;max-width:800px}
     button,select{padding:.6rem 1rem;margin:.25rem;border-radius:.6rem;border:1px solid #ccc;cursor:pointer}
+    label.toggle{display:inline-flex;align-items:center;gap:.5rem;margin:.5rem 0;cursor:pointer}
+    label.toggle input{cursor:pointer}
     #status{margin:.5rem 0;color:#555}
     #transcript{white-space:pre-wrap;background:#f7f7f7;border:1px solid #eee;padding:1rem;border-radius:.6rem;min-height:6rem}
+    #breakdown{white-space:pre-wrap;background:#f7f7f7;border:1px solid #eee;padding:1rem;border-radius:.6rem;margin-top:.5rem}
+    .hidden{display:none}
+    .breakdown-row{margin:.35rem 0}
+    .breakdown-row strong{font-weight:600}
   </style>
 </head>
 <body>
   <h1>🎙️ Voice Translator</h1>
-  <p>Speak into the mic; the AI replies <b>out loud</b> in your chosen language.</p>
+  <p>Speak into the mic; the AI repeats a literal translation <b>out loud</b> in your chosen language.</p>
 
   <label for="lang">Reply language: </label>
   <select id="lang">
@@ -25,6 +31,8 @@
     <option>Chinese</option>
   </select>
 
+  <label class="toggle"><input type="checkbox" id="verbose" /> Verbose word-by-word breakdown</label>
+
   <div>
     <button id="connect">Connect mic</button>
     <button id="stop" disabled>Stop</button>
@@ -33,6 +41,11 @@
 
   <h3>Transcript</h3>
   <div id="transcript"></div>
+
+  <section id="breakdownSection" class="hidden">
+    <h3>Word-by-word breakdown</h3>
+    <div id="breakdown"></div>
+  </section>
 
   <audio id="remoteAudio" autoplay></audio>
 

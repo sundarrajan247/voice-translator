@@ -11,10 +11,28 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
   try {
-    const { language = 'Spanish' } = req.body || {};
-    const instructions =
-      `You are a translator bot. The user may speak any language. ` +
-      `Translate and reply ONLY in spoken ${language}. Keep replies concise.`;
+    const { language = 'Spanish', verbose = false } = req.body || {};
+    const instructionParts = [
+      `You are a literal translation assistant. The user may speak any language.`,
+      `For every user utterance, provide a faithful, literal translation into ${language}.`,
+      `Do not answer questions or add commentary—only translate what the user said.`,
+      `Respond out loud exclusively with the translated sentence in ${language}.`
+    ];
+
+    if (verbose) {
+      instructionParts.push(
+        `After you finish speaking, send exactly one JSON message over the "oai-events" data channel ` +
+          `with the shape {"type":"translation.breakdown","source":"<source sentence>",` +
+          `"target":"<translated sentence>","breakdown":[{"source":"<source word>",` +
+          `"target":"<translated word>","meaning":"<short meaning>"},…]}.`,
+        `Include every meaningful word in the breakdown with short English glosses.`,
+        `Do not speak the breakdown out loud and do not send any other commentary.`
+      );
+    } else {
+      instructionParts.push(`Do not provide explanations, definitions, or follow-up remarks.`);
+    }
+
+    const instructions = instructionParts.join(' ');
 
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
