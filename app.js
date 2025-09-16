@@ -7,14 +7,27 @@ const langSel = document.getElementById('lang');
 
 let pc, localStream, dataChannel;
 
+const TOKEN_ENDPOINT = (() => {
+  if (typeof window !== 'undefined' && window.RT_TOKEN_ENDPOINT) {
+    return window.RT_TOKEN_ENDPOINT;
+  }
+  if (typeof process !== 'undefined' && process.env && process.env.RT_TOKEN_ENDPOINT) {
+    return process.env.RT_TOKEN_ENDPOINT;
+  }
+  return '/api/rt-token';
+})();
+
 async function getEphemeralToken(selectedLanguage) {
-  // TODO: replace with your deployed Vercel URL in a later step
-  const resp = await fetch('https://YOUR-VERCEL-APP.vercel.app/api/rt-token', {
+  const resp = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ language: selectedLanguage })
   });
-  if (!resp.ok) throw new Error(await resp.text());
+  if (!resp.ok) {
+    const errorBody = await resp.text();
+    console.error(`Token request failed: ${resp.status} ${resp.statusText}`, errorBody);
+    throw new Error(`Token request failed with status ${resp.status}`);
+  }
   const js = await resp.json();
   return js.client_secret?.value; // short-lived token returned by your Vercel function
 }
