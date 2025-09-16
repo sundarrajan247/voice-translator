@@ -8,7 +8,10 @@
     body{font-family:system-ui,Segoe UI,Arial;margin:2rem;max-width:800px}
     button,select{padding:.6rem 1rem;margin:.25rem;border-radius:.6rem;border:1px solid #ccc;cursor:pointer}
     #status{margin:.5rem 0;color:#555}
-    #transcript{white-space:pre-wrap;background:#f7f7f7;border:1px solid #eee;padding:1rem;border-radius:.6rem;min-height:6rem}
+    .transcript-wrapper{margin-top:1.5rem}
+    .transcript-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+    .transcript-box{white-space:pre-wrap;background:#f7f7f7;border:1px solid #eee;padding:1rem;border-radius:.6rem;min-height:6rem}
+    .transcript-heading{margin:.25rem 0 .75rem;font-size:1rem;color:#333}
   </style>
 </head>
 <body>
@@ -31,8 +34,19 @@
     <span id="status">idle</span>
   </div>
 
-  <h3>Transcript</h3>
-  <div id="transcript"></div>
+  <section class="transcript-wrapper">
+    <h3>Transcript</h3>
+    <div class="transcript-grid">
+      <div>
+        <h4 class="transcript-heading" id="transcript-input-label">Input (what you said)</h4>
+        <div id="transcript-input" class="transcript-box" aria-live="polite"></div>
+      </div>
+      <div>
+        <h4 class="transcript-heading" id="transcript-output-label">Output</h4>
+        <div id="transcript-output" class="transcript-box" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
 
   <audio id="remoteAudio" autoplay></audio>
 
