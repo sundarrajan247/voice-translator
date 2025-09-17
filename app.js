@@ -9,6 +9,7 @@ const breakdownSection = document.getElementById('breakdownSection');
 const breakdownEl = document.getElementById('breakdown');
 
 let pc, localStream, dataChannel, verboseEnabled = false;
+const jsonBufferByResponse = new Map();
 
 if (verboseEl && breakdownSection && breakdownEl) {
   verboseEl.addEventListener('change', () => {
@@ -17,6 +18,7 @@ if (verboseEl && breakdownSection && breakdownEl) {
     } else {
       breakdownEl.textContent = '';
       breakdownSection?.classList.add('hidden');
+      jsonBufferByResponse.clear();
     }
   });
 }
@@ -55,6 +57,7 @@ async function connect() {
     });
 
     verboseEnabled = !!verboseEl?.checked;
+    jsonBufferByResponse.clear();
     if (breakdownEl) breakdownEl.textContent = '';
     if (verboseEnabled) {
       breakdownSection?.classList.remove('hidden');
@@ -74,14 +77,42 @@ async function connect() {
     // optional data channel for transcript/events
     dataChannel = pc.createDataChannel('oai-events');
     dataChannel.onmessage = (ev) => {
+      let msg;
       try {
-        const msg = JSON.parse(ev.data);
-        if (msg.type === 'transcript.partial' || msg.type === 'transcript.final') {
-          transcriptEl.textContent = msg.text;
-        } else if (msg.type === 'translation.breakdown') {
-          renderBreakdown(msg);
+        msg = JSON.parse(ev.data);
+      } catch {
+        return; // ignore non-JSON messages
+      }
+
+      if (msg.type === 'transcript.partial' || msg.type === 'transcript.final') {
+        transcriptEl.textContent = msg.text;
+        return;
+      }
+
+      if (msg.type === 'translation.breakdown') {
+        renderBreakdown(msg);
+        return;
+      }
+
+      if (msg.type === 'response.output_json.delta') {
+        const responseId = msg.response?.id || msg.item_id || 'default';
+        const previous = jsonBufferByResponse.get(responseId) || '';
+        jsonBufferByResponse.set(responseId, previous + (msg.delta || ''));
+        return;
+      }
+
+      if (msg.type === 'response.output_json.done') {
+        const responseId = msg.response?.id || msg.item_id || 'default';
+        const payload = jsonBufferByResponse.get(responseId);
+        jsonBufferByResponse.delete(responseId);
+        if (!payload) return;
+        try {
+          const breakdownMsg = JSON.parse(payload);
+          renderBreakdown(breakdownMsg);
+        } catch (err) {
+          console.warn('Failed to parse breakdown JSON', err);
         }
-      } catch { /* ignore non-JSON messages */ }
+      }
     };
 
     // send mic to the model
@@ -118,6 +149,7 @@ async function connect() {
     if (breakdownEl) breakdownEl.textContent = '';
     breakdownSection?.classList.add('hidden');
     verboseEnabled = false;
+    jsonBufferByResponse.clear();
   }
 }
 
@@ -129,6 +161,7 @@ function stop() {
   if (breakdownEl) breakdownEl.textContent = '';
   breakdownSection?.classList.add('hidden');
   verboseEnabled = false;
+  jsonBufferByResponse.clear();
   if (dataChannel && dataChannel.readyState === 'open') dataChannel.close();
   if (pc) pc.close();
   if (localStream) localStream.getTracks().forEach(t => t.stop());
@@ -142,9 +175,11 @@ function renderBreakdown(msg) {
   if (breakdownSection) breakdownSection.classList.remove('hidden');
   breakdownEl.innerHTML = '';
 
+  const payload = msg?.data && typeof msg.data === 'object' ? msg.data : msg;
+
   const safeString = (value) => (typeof value === 'string' ? value.trim() : '');
-  const sourceSentence = safeString(msg.source || msg.original || msg.input);
-  const targetSentence = safeString(msg.target || msg.translation || msg.text);
+  const sourceSentence = safeString(payload.source || payload.original || payload.input);
+  const targetSentence = safeString(payload.target || payload.translation || payload.text);
 
   if (sourceSentence) {
     const originalRow = document.createElement('div');
@@ -160,7 +195,9 @@ function renderBreakdown(msg) {
     breakdownEl.appendChild(translatedRow);
   }
 
-  const breakdownList = Array.isArray(msg.breakdown) ? msg.breakdown : null;
+  let breakdownList = Array.isArray(payload.breakdown) ? payload.breakdown : null;
+  if (!breakdownList && Array.isArray(payload.words)) breakdownList = payload.words;
+  if (!breakdownList && Array.isArray(payload.entries)) breakdownList = payload.entries;
 
   if (breakdownList && breakdownList.length) {
     breakdownList.forEach((entry) => {
