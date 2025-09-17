@@ -1,60 +1,39 @@
-// api/rt-token.js — Vercel Serverless Function
-// Returns an ephemeral client_secret for the browser to start a Realtime session.
-
 export default async function handler(req, res) {
-  // CORS for GitHub Pages -> Vercel calls
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'content-type');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-
-  if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'POST') return res.status(405).send('Method not allowed');
-
   try {
-    const { language = 'Spanish', verbose = false } = req.body || {};
-    const instructionParts = [
-      `You are a literal translation assistant. The user may speak any language.`,
-      `For every user utterance, provide a faithful, literal translation into ${language}.`,
-      `Do not answer questions or add commentary—only translate what the user said.`,
-      `Respond out loud exclusively with the translated sentence in ${language}.`
-    ];
-
-    if (verbose) {
-      instructionParts.push(
-        `After you finish speaking, send exactly one JSON message over the "oai-events" data channel ` +
-          `with the shape {"type":"translation.breakdown","source":"<source sentence>",` +
-          `"target":"<translated sentence>","breakdown":[{"source":"<source word>",` +
-          `"target":"<translated word>","meaning":"<short meaning>"},…]}.`,
-        `Include every meaningful word in the breakdown with short English glosses.`,
-        `Do not speak the breakdown out loud and do not send any other commentary.`
-      );
-    } else {
-      instructionParts.push(`Do not provide explanations, definitions, or follow-up remarks.`);
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const instructions = instructionParts.join(' ');
+    const { language, verbose } = req.body || {};
+    // You can log these for debugging or enforce validation
+    // console.log('Requested:', { language, verbose });
 
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        // gpt-realtime is a placeholder name; use the exact model you enabled
         model: 'gpt-realtime',
         voice: 'verse',
-        instructions
-        // You can add other session options here later (tools, transcript events, etc.)
-      }),
+        // Optionally pass default instructions here too, but we mostly set them client-side
+        // We'll still echo back language/verbose as metadata if you want to use server-side
+        // ...anything else required by your setup
+      })
     });
 
-    const text = await r.text();
-    if (!r.ok) return res.status(r.status).send(text);
+    if (!r.ok) {
+      const text = await r.text();
+      return res.status(r.status).json({ error: text });
+    }
 
-    const session = JSON.parse(text);
-    // session.client_secret.value is what the browser needs
-    return res.status(200).json({ client_secret: session.client_secret });
-  } catch (e) {
-    return res.status(500).send(String(e));
+    const js = await r.json();
+    // Return the short-lived secret
+    return res.status(200).json({ client_secret: { value: js.client_secret?.value || js.client_secret } });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Internal error minting token' });
   }
 }

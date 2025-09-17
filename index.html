@@ -1,54 +1,71 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Voice Translator (OpenAI Realtime)</title>
-  <style>
-    body{font-family:system-ui,Segoe UI,Arial;margin:2rem;max-width:800px}
-    button,select{padding:.6rem 1rem;margin:.25rem;border-radius:.6rem;border:1px solid #ccc;cursor:pointer}
-    label.toggle{display:inline-flex;align-items:center;gap:.5rem;margin:.5rem 0;cursor:pointer}
-    label.toggle input{cursor:pointer}
-    #status{margin:.5rem 0;color:#555}
-    #transcript{white-space:pre-wrap;background:#f7f7f7;border:1px solid #eee;padding:1rem;border-radius:.6rem;min-height:6rem}
-    #breakdown{white-space:pre-wrap;background:#f7f7f7;border:1px solid #eee;padding:1rem;border-radius:.6rem;margin-top:.5rem}
-    .hidden{display:none}
-    .breakdown-row{margin:.35rem 0}
-    .breakdown-row strong{font-weight:600}
-  </style>
-</head>
-<body>
-  <h1>🎙️ Voice Translator</h1>
-  <p>Speak into the mic; the AI repeats a literal translation <b>out loud</b> in your chosen language.</p>
+  <head>
+    <meta charset="utf-8" />
+    <title>Voice Translator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      .row { display: flex; gap: 16px; flex-wrap: wrap; }
+      .col { flex: 1 1 320px; min-width: 280px; }
+      .panel { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+      .label { font-weight: 600; margin-bottom: 6px; display: block; }
+      .box { min-height: 120px; background: #fafafa; border: 1px dashed #ccc; border-radius: 6px; padding: 10px; white-space: pre-wrap; }
+      .controls { display: flex; gap: 8px; align-items: center; margin: 12px 0; }
+      .hidden { display: none; }
+      .breakdown-row { padding: 4px 0; border-bottom: 1px dotted #eee; }
+      .status { margin-left: 8px; opacity: 0.8; }
+      audio { display: block; margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Voice Translator</h1>
 
-  <label for="lang">Reply language: </label>
-  <select id="lang">
-    <option>Tamil</option>
-    <option>Spanish</option>
-    <option>Kannada</option>
-    <option>Hindi</option>
-    <option>French</option>
-    <option>Chinese</option>
-  </select>
+    <div class="controls">
+      <button id="connect">Connect</button>
+      <button id="stop" disabled>Stop</button>
+      <span id="status" class="status">idle</span>
 
-  <label class="toggle"><input type="checkbox" id="verbose" /> Verbose word-by-word breakdown</label>
+      <label style="margin-left:16px;">
+        Language:
+        <select id="lang">
+          <option>Spanish</option>
+          <option>French</option>
+          <option>Hindi</option>
+          <option>Tamil</option>
+          <option>Kannada</option>
+          <option>Chinese</option>
+        </select>
+      </label>
 
-  <div>
-    <button id="connect">Connect mic</button>
-    <button id="stop" disabled>Stop</button>
-    <span id="status">idle</span>
-  </div>
+      <label style="margin-left:16px;">
+        <input type="checkbox" id="verbose" />
+        Verbose
+      </label>
+    </div>
 
-  <h3>Transcript</h3>
-  <div id="transcript"></div>
+    <div class="row">
+      <div class="col">
+        <div class="panel">
+          <span id="transcript-input-label" class="label">Input (what you said)</span>
+          <div id="transcript-input" class="box"></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="panel">
+          <span id="transcript-output-label" class="label">Output (—)</span>
+          <div id="transcript-output" class="box"></div>
+        </div>
+      </div>
+    </div>
 
-  <section id="breakdownSection" class="hidden">
-    <h3>Word-by-word breakdown</h3>
-    <div id="breakdown"></div>
-  </section>
+    <div id="breakdownSection" class="panel hidden" style="margin-top:16px;">
+      <span class="label">Word-by-word breakdown</span>
+      <div id="breakdown"></div>
+    </div>
 
-  <audio id="remoteAudio" autoplay></audio>
+    <audio id="remoteAudio" autoplay></audio>
 
-  <script src="app.js"></script>
-</body>
+    <script src="./app.js"></script>
+  </body>
 </html>
