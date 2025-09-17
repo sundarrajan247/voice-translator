@@ -7,9 +7,14 @@ const transcriptInputLabelEl = document.getElementById('transcript-input-label')
 const transcriptOutputLabelEl = document.getElementById('transcript-output-label');
 const remoteAudioEl = document.getElementById('remoteAudio');
 const langSel = document.getElementById('lang');
-const verboseToggle = document.getElementById('verbose');
 
-let pc, localStream, dataChannel;
+const verboseEl = document.getElementById('verbose');
+const breakdownSection = document.getElementById('breakdownSection');
+const breakdownEl = document.getElementById('breakdown');
+
+let pc, localStream, dataChannel, verboseEnabled = false;
+
+// ---------- Transcript state & helpers ----------
 let activeResponseId = null;
 let latestUserTranscript = '';
 let latestAssistantTranscript = '';
@@ -44,6 +49,69 @@ function resetTranscripts() {
   if (transcriptInputEl) transcriptInputEl.textContent = '';
   if (transcriptOutputEl) transcriptOutputEl.textContent = '';
   updateInputTranscriptLabel('');
+}
+
+function extractMessageText(msg) {
+  if (!msg || typeof msg !== 'object') return '';
+  if (typeof msg.text === 'string') return msg.text;
+  if (Array.isArray(msg.text)) return msg.text.join('');
+  if (typeof msg.delta === 'string') return msg.delta;
+  if (Array.isArray(msg.delta)) return msg.delta.join('');
+  if (msg.delta && typeof msg.delta === 'object') {
+    if (typeof msg.delta.text === 'string') return msg.delta.text;
+    if (Array.isArray(msg.delta.text)) return msg.delta.text.join('');
+    if (typeof msg.delta.transcript === 'string') return msg.delta.transcript;
+  }
+  if (typeof msg.transcript === 'string') return msg.transcript;
+  if (typeof msg.message === 'string') return msg.message;
+  if (typeof msg.output_text === 'string') return msg.output_text;
+  if (Array.isArray(msg.output_text)) return msg.output_text.join('');
+  if (msg.transcript && typeof msg.transcript.text === 'string') return msg.transcript.text;
+  if (msg.transcript && typeof msg.transcript.delta === 'string') return msg.transcript.delta;
+  if (msg.response && Array.isArray(msg.response.output)) {
+    const pieces = [];
+    for (const item of msg.response.output) {
+      if (!item || typeof item !== 'object' || !Array.isArray(item.content)) continue;
+      for (const content of item.content) {
+        if (!content || typeof content !== 'object') continue;
+        if (typeof content.text === 'string') pieces.push(content.text);
+        if (typeof content.transcript === 'string') pieces.push(content.transcript);
+        if (typeof content.delta === 'string') pieces.push(content.delta);
+        if (Array.isArray(content.delta)) pieces.push(content.delta.join(''));
+      }
+    }
+    if (pieces.length) return pieces.join('');
+  }
+  return '';
+}
+
+function getMessageRole(msg) {
+  const candidates = [
+    msg.participant,
+    msg.role,
+    msg.speaker,
+    msg.source,
+    msg.from,
+    msg.direction,
+    msg.channel,
+    msg.track,
+    msg.audio_track,
+    msg.audio_track_id,
+    msg.transcript?.participant,
+    msg.transcript?.role,
+    msg.response?.role,
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (typeof candidate === 'string') return candidate;
+    if (typeof candidate === 'object') {
+      for (const key of ['role', 'name', 'id', 'type']) {
+        if (typeof candidate[key] === 'string') return candidate[key];
+      }
+    }
+  }
+  return '';
 }
 
 function handleTranscriptEvent(msg) {
@@ -149,74 +217,25 @@ function handleTranscriptEvent(msg) {
   }
 }
 
-function extractMessageText(msg) {
-  if (!msg || typeof msg !== 'object') return '';
-  if (typeof msg.text === 'string') return msg.text;
-  if (Array.isArray(msg.text)) return msg.text.join('');
-  if (typeof msg.delta === 'string') return msg.delta;
-  if (Array.isArray(msg.delta)) return msg.delta.join('');
-  if (msg.delta && typeof msg.delta === 'object') {
-    if (typeof msg.delta.text === 'string') return msg.delta.text;
-    if (Array.isArray(msg.delta.text)) return msg.delta.text.join('');
-    if (typeof msg.delta.transcript === 'string') return msg.delta.transcript;
-  }
-  if (typeof msg.transcript === 'string') return msg.transcript;
-  if (typeof msg.message === 'string') return msg.message;
-  if (typeof msg.output_text === 'string') return msg.output_text;
-  if (Array.isArray(msg.output_text)) return msg.output_text.join('');
-  if (msg.transcript && typeof msg.transcript.text === 'string') return msg.transcript.text;
-  if (msg.transcript && typeof msg.transcript.delta === 'string') return msg.transcript.delta;
-  if (msg.response && Array.isArray(msg.response.output)) {
-    const pieces = [];
-    for (const item of msg.response.output) {
-      if (!item || typeof item !== 'object' || !Array.isArray(item.content)) continue;
-      for (const content of item.content) {
-        if (!content || typeof content !== 'object') continue;
-        if (typeof content.text === 'string') pieces.push(content.text);
-        if (typeof content.transcript === 'string') pieces.push(content.transcript);
-        if (typeof content.delta === 'string') pieces.push(content.delta);
-        if (Array.isArray(content.delta)) pieces.push(content.delta.join(''));
-      }
+// ---------- Verbose toggle UI ----------
+if (verboseEl && breakdownSection && breakdownEl) {
+  verboseEl.addEventListener('change', () => {
+    if (verboseEl.checked) {
+      breakdownSection.classList.remove('hidden');
+    } else {
+      breakdownEl.textContent = '';
+      breakdownSection.classList.add('hidden');
     }
-    if (pieces.length) return pieces.join('');
-  }
-  return '';
+  });
 }
 
-function getMessageRole(msg) {
-  const candidates = [
-    msg.participant,
-    msg.role,
-    msg.speaker,
-    msg.source,
-    msg.from,
-    msg.direction,
-    msg.channel,
-    msg.track,
-    msg.audio_track,
-    msg.audio_track_id,
-    msg.transcript?.participant,
-    msg.transcript?.role,
-    msg.response?.role,
-  ];
-
-  for (const candidate of candidates) {
-    if (!candidate) continue;
-    if (typeof candidate === 'string') return candidate;
-    if (typeof candidate === 'object') {
-      for (const key of ['role', 'name', 'id', 'type']) {
-        if (typeof candidate[key] === 'string') return candidate[key];
-      }
-    }
-  }
-  return '';
-}
-
+// ---------- Language label hookup ----------
 if (langSel) {
   updateOutputTranscriptLabel();
   langSel.addEventListener('change', updateOutputTranscriptLabel);
 }
 
+// ---------- Token endpoint ----------
 const TOKEN_ENDPOINT = (() => {
   if (typeof window !== 'undefined' && window.RT_TOKEN_ENDPOINT) {
     return window.RT_TOKEN_ENDPOINT;
@@ -227,14 +246,11 @@ const TOKEN_ENDPOINT = (() => {
   return '/api/rt-token';
 })();
 
-async function getEphemeralToken(selectedLanguage, verboseMode) {
+async function getEphemeralToken(selectedLanguage, verbose) {
   const resp = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      language: selectedLanguage,
-      verbose: Boolean(verboseMode)
-    })
+    body: JSON.stringify({ language: selectedLanguage, verbose })
   });
   if (!resp.ok) {
     const errorBody = await resp.text();
@@ -245,20 +261,29 @@ async function getEphemeralToken(selectedLanguage, verboseMode) {
   return js.client_secret?.value; // short-lived token returned by your Vercel function
 }
 
+// ---------- Connect / Stop ----------
 async function connect() {
   try {
     resetTranscripts();
     if (langSel) updateOutputTranscriptLabel();
     connectBtn.disabled = true;
     statusEl.textContent = 'requesting mic…';
+
     localStream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
 
+    verboseEnabled = !!verboseEl?.checked;
+    if (breakdownEl) breakdownEl.textContent = '';
+    if (verboseEnabled) {
+      breakdownSection?.classList.remove('hidden');
+    } else {
+      breakdownSection?.classList.add('hidden');
+    }
+
     statusEl.textContent = 'minting token…';
     const selectedLanguage = langSel ? langSel.value : 'Spanish';
-    const verboseMode = verboseToggle ? verboseToggle.checked : false;
-    const token = await getEphemeralToken(selectedLanguage, verboseMode);
+    const token = await getEphemeralToken(selectedLanguage, verboseEnabled);
 
     statusEl.textContent = 'creating peer connection…';
     pc = new RTCPeerConnection();
@@ -271,9 +296,14 @@ async function connect() {
     dataChannel.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);
+        // robust transcript handler
         handleTranscriptEvent(msg);
-      } catch (err) {
-        console.warn('Non-JSON event from data channel', err, ev.data);
+        // optional JSON breakdown
+        if (msg.type === 'translation.breakdown') {
+          renderBreakdown(msg);
+        }
+      } catch {
+        // ignore non-JSON messages
       }
     };
 
@@ -310,6 +340,9 @@ async function connect() {
     connectBtn.disabled = false;
     stopBtn.disabled = true;
     resetTranscripts();
+    if (breakdownEl) breakdownEl.textContent = '';
+    breakdownSection?.classList.add('hidden');
+    verboseEnabled = false;
   }
 }
 
@@ -318,6 +351,10 @@ function stop() {
   connectBtn.disabled = false;
   statusEl.textContent = 'stopped';
   resetTranscripts();
+  if (breakdownEl) breakdownEl.textContent = '';
+  breakdownSection?.classList.add('hidden');
+  verboseEnabled = false;
+
   if (dataChannel && dataChannel.readyState === 'open') dataChannel.close();
   if (pc) pc.close();
   if (localStream) localStream.getTracks().forEach(t => t.stop());
@@ -325,3 +362,73 @@ function stop() {
 
 connectBtn.onclick = connect;
 stopBtn.onclick = stop;
+
+// ---------- Breakdown renderer ----------
+function renderBreakdown(msg) {
+  if (!verboseEnabled || !breakdownEl) return;
+  if (breakdownSection) breakdownSection.classList.remove('hidden');
+  breakdownEl.innerHTML = '';
+
+  const safeString = (value) => (typeof value === 'string' ? value.trim() : '');
+  const sourceSentence = safeString(msg.source || msg.original || msg.input);
+  const targetSentence = safeString(msg.target || msg.translation || msg.text);
+
+  if (sourceSentence) {
+    const originalRow = document.createElement('div');
+    originalRow.className = 'breakdown-row';
+    originalRow.textContent = `Original: ${sourceSentence}`;
+    breakdownEl.appendChild(originalRow);
+  }
+
+  if (targetSentence) {
+    const translatedRow = document.createElement('div');
+    translatedRow.className = 'breakdown-row';
+    translatedRow.textContent = `Translation: ${targetSentence}`;
+    breakdownEl.appendChild(translatedRow);
+  }
+
+  const breakdownList = Array.isArray(msg.breakdown) ? msg.breakdown : null;
+
+  if (breakdownList && breakdownList.length) {
+    breakdownList.forEach((entry) => {
+      const sourceWord = safeString(entry.source || entry.input || entry.word);
+      const targetWord = safeString(entry.target || entry.translation || entry.output);
+      const meaning = safeString(entry.meaning || entry.gloss || entry.note);
+
+      if (!sourceWord && !targetWord && !meaning) return;
+
+      const row = document.createElement('div');
+      row.className = 'breakdown-row';
+
+      if (sourceWord) {
+        const sourceEl = document.createElement('strong');
+        sourceEl.textContent = sourceWord;
+        row.appendChild(sourceEl);
+      }
+
+      if (targetWord) {
+        if (row.childNodes.length) {
+          const arrowEl = document.createElement('span');
+          arrowEl.textContent = ' → ';
+          row.appendChild(arrowEl);
+        }
+        const targetEl = document.createElement('strong');
+        targetEl.textContent = targetWord;
+        row.appendChild(targetEl);
+      }
+
+      if (meaning) {
+        const meaningEl = document.createElement('span');
+        meaningEl.textContent = (row.childNodes.length ? ' — ' : '') + meaning;
+        row.appendChild(meaningEl);
+      }
+
+      breakdownEl.appendChild(row);
+    });
+  } else if (msg.explanation || msg.details) {
+    const fallbackRow = document.createElement('div');
+    fallbackRow.className = 'breakdown-row';
+    fallbackRow.textContent = safeString(msg.explanation || msg.details);
+    breakdownEl.appendChild(fallbackRow);
+  }
+}
