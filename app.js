@@ -7,6 +7,7 @@ const transcriptInputLabelEl = document.getElementById('transcript-input-label')
 const transcriptOutputLabelEl = document.getElementById('transcript-output-label');
 const remoteAudioEl = document.getElementById('remoteAudio');
 const langSel = document.getElementById('lang');
+const verboseToggle = document.getElementById('verbose');
 
 let pc, localStream, dataChannel;
 let activeResponseId = null;
@@ -226,11 +227,14 @@ const TOKEN_ENDPOINT = (() => {
   return '/api/rt-token';
 })();
 
-async function getEphemeralToken(selectedLanguage) {
+async function getEphemeralToken(selectedLanguage, verboseMode) {
   const resp = await fetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ language: selectedLanguage })
+    body: JSON.stringify({
+      language: selectedLanguage,
+      verbose: Boolean(verboseMode)
+    })
   });
   if (!resp.ok) {
     const errorBody = await resp.text();
@@ -253,7 +257,8 @@ async function connect() {
 
     statusEl.textContent = 'minting token…';
     const selectedLanguage = langSel ? langSel.value : 'Spanish';
-    const token = await getEphemeralToken(selectedLanguage);
+    const verboseMode = verboseToggle ? verboseToggle.checked : false;
+    const token = await getEphemeralToken(selectedLanguage, verboseMode);
 
     statusEl.textContent = 'creating peer connection…';
     pc = new RTCPeerConnection();

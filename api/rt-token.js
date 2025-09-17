@@ -11,10 +11,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method not allowed');
 
   try {
-    const { language = 'Spanish' } = req.body || {};
-    const instructions =
+    const { language = 'Spanish', verbose = false } = req.body || {};
+    const verboseMode = typeof verbose === 'string'
+      ? verbose.toLowerCase() === 'true'
+      : Boolean(verbose);
+
+    const baseInstructions =
       `You are a translator bot. The user may speak any language. ` +
-      `Translate and reply ONLY in spoken ${language}. Keep replies concise.`;
+      `Translate and reply ONLY in spoken ${language}.`;
+
+    const instructions = verboseMode
+      ? baseInstructions + ' Provide a detailed, word-by-word explanation of the translation so the listener understands how each segment maps to the final spoken response.'
+      : baseInstructions + ' Keep replies concise and natural sounding.';
 
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
